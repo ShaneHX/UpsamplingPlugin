@@ -41,6 +41,8 @@ UpsamplePlugin::UpsamplePlugin(const std::string name, int scale_factor, bool al
     , mAlignCorners(align_corners)
     , mScaleFactor(scale_factor)
 {
+    printf("UpsamplePlugin::UpsamplePlugin1\n");
+    printf("------s: %d, a: %d\n",mScaleFactor, mAlignCorners);
     mInputShape.c() = -1;
     mInputShape.h() = -1;
     mInputShape.w() = -1;
@@ -49,6 +51,7 @@ UpsamplePlugin::UpsamplePlugin(const std::string name, int scale_factor, bool al
 UpsamplePlugin::UpsamplePlugin(const std::string name, const void* data, size_t length)
     : mLayerName(name)
 {
+    printf("UpsamplePlugin::UpsamplePlugin2\n");
     // Deserialize in the same order as serialization
     const char *d = static_cast<const char *>(data);
     const char *a = d;
@@ -66,41 +69,56 @@ UpsamplePlugin::UpsamplePlugin(const std::string name, const void* data, size_t 
 
 const char* UpsamplePlugin::getPluginType() const
 {
+    printf("UpsamplePlugin::getPluginType\n");
     return UPSAMPLE_PLUGIN_NAME;
 }
 
 const char* UpsamplePlugin::getPluginVersion() const
 {
+    printf("UpsamplePlugin::getPluginVersion\n");
     return UPSAMPLE_PLUGIN_VERSION;
 }
 
 int UpsamplePlugin::getNbOutputs() const
 {
+    printf("UpsamplePlugin::getNbOutputs\n");
     return 1;
 }
 
 Dims UpsamplePlugin::getOutputDimensions(int index, const Dims* inputs, int nbInputDims)
 {
+    printf("UpsamplePlugin::getOutputDimensions\n");
     // Validate input arguments
-    assert(index == 0 && nbInputDims == 1 && inputs[0].nbDims == 3);
-
+    assert(index == 0);
+    assert(nbInputDims == 1);
+    assert(inputs[0].nbDims == 4); 
+    // printf("%d\n",inputs[0].nbDims);
     // Clipping doesn't change input dimension, so output Dims will be the same as input Dims
-    return nvinfer1::DimsCHW{inputs[0].d[0], inputs[0].d[1]*mScaleFactor, inputs[0].d[2]*mScaleFactor};
+
+    int b = inputs[0].d[0];
+    int c = inputs[0].d[1];
+    int h = inputs[0].d[2]*mScaleFactor;
+    int w = inputs[0].d[3]*mScaleFactor;
+
+    printf("------b:%d, c:%d, h:%d, w:%d\n",b,c,h,w);
+    return nvinfer1::DimsNCHW{inputs[0].d[0], inputs[0].d[1], inputs[0].d[2]*mScaleFactor, inputs[0].d[3]*mScaleFactor};
+    // return *inputs;
 }
 
 int UpsamplePlugin::initialize()
 {
+    printf("UpsamplePlugin::initialize\n");
     return 0;
 }
 
 
 int UpsamplePlugin::enqueue(int batchSize, const void* const* inputs, void** outputs, void*, cudaStream_t stream)
 {
+    printf("UpsamplePlugin::enqueue\n");
     int status = -1;
 
     // Our plugin outputs only one tensor
     void* output = outputs[0];
-
 
     // Launch CUDA kernel wrapper and save its return value
     status = UpsampleInference(stream, mInputVolume, 
@@ -113,12 +131,14 @@ int UpsamplePlugin::enqueue(int batchSize, const void* const* inputs, void** out
 
 size_t UpsamplePlugin::getSerializationSize() const
 {
+    printf("UpsamplePlugin::getSerializationSize\n");
     return sizeof(bool) + sizeof(int);
 }
 
 
 void UpsamplePlugin::serialize(void* buffer) const 
 {
+    printf("UpsamplePlugin::serialize\n");
     char *d = static_cast<char *>(buffer);
     const char *a = d;
 
@@ -130,21 +150,23 @@ void UpsamplePlugin::serialize(void* buffer) const
 
 void UpsamplePlugin::configureWithFormat(const Dims* inputs, int nbInputs, const Dims* outputs, int nbOutputs, DataType type, PluginFormat format, int)
 {
+    printf("UpsamplePlugin::configureWithFormat\n");
     // Validate input arguments
     assert(nbOutputs == 1);
     assert(type == DataType::kFLOAT);
     assert(format == PluginFormat::kNCHW);
-
+    assert(inputs[0].nbDims == 4);
     // Fetch volume for future enqueue() operations
-    size_t volume = inputs[0].d[1]*mScaleFactor * inputs[0].d[2]*mScaleFactor;
+    size_t volume = inputs[0].d[2]*mScaleFactor * inputs[0].d[3]*mScaleFactor;
     mInputVolume = volume;
-    mInputShape.c() = inputs[0].d[0];
-    mInputShape.h() = inputs[0].d[1];
-    mInputShape.w() = inputs[0].d[2];
+    mInputShape.c() = inputs[0].d[1];
+    mInputShape.h() = inputs[0].d[2];
+    mInputShape.w() = inputs[0].d[3];
 }
 
 bool UpsamplePlugin::supportsFormat(DataType type, PluginFormat format) const
 {
+    printf("UpsamplePlugin::supportsFormat\n");
     // This plugin only supports ordinary floats, and NCHW input format
     if (type == DataType::kFLOAT && format == PluginFormat::kNCHW)
         return true;
@@ -176,6 +198,7 @@ const char* UpsamplePlugin::getPluginNamespace() const
 
 UpsamplePluginCreator::UpsamplePluginCreator()
 {
+    printf("UpsamplePluginCreator::UpsamplePluginCreator\n");
     // Describe UpsamplePlugin's required PluginField arguments
     mPluginAttributes.emplace_back(PluginField("scaleFactor", nullptr, PluginFieldType::kINT8, 1));
     mPluginAttributes.emplace_back(PluginField("alignCorners", nullptr, PluginFieldType::kINT8, 1));
@@ -186,34 +209,41 @@ UpsamplePluginCreator::UpsamplePluginCreator()
 }
 const char* UpsamplePluginCreator::getPluginName() const
 {
+    printf("UpsamplePluginCreator::getPluginName\n");
     return UPSAMPLE_PLUGIN_NAME;
 }
 
 const char* UpsamplePluginCreator::getPluginVersion() const
 {
+    printf("UpsamplePluginCreator::getPluginVersion\n");
     return UPSAMPLE_PLUGIN_VERSION;
 }
 
 const PluginFieldCollection* UpsamplePluginCreator::getFieldNames()
 {
+    printf("UpsamplePluginCreator::getFieldNames\n");
     return &mFC;
 }
 
 IPluginV2* UpsamplePluginCreator::createPlugin(const char* name, const PluginFieldCollection* fc)
 {
+    printf("UpsamplePluginCreator::createPlugin\n");
     int scaleFactor = 0;
-    bool alignCorners = 0;
+    bool alignCorners = false;
     const PluginField* fields = fc->fields;
 
     // Parse fields from PluginFieldCollection
     assert(fc->nbFields == 2);
     for (int i = 0; i < fc->nbFields; i++){
+    
         if (strcmp(fields[i].name, "scaleFactor") == 0) {
             assert(fields[i].type == PluginFieldType::kINT8);
-            scaleFactor = *(static_cast<const int*>(fields[i].data));
-        } else if (strcmp(fields[i].name, "clipMax") == 0) {
-            assert(fields[i].type == PluginFieldType::kFLOAT32);
-            alignCorners = bool(*(static_cast<const int*>(fields[i].data)));
+            scaleFactor = *(static_cast<const int8_t*>(fields[i].data));
+        } 
+        else if (strcmp(fields[i].name, "alignCorners") == 0) {
+            assert(fields[i].type == PluginFieldType::kINT8);
+            int a = *(static_cast<const int8_t*>(fields[i].data));
+            alignCorners = (a==0) ? false : true;
         }
     }
     return new UpsamplePlugin(name, scaleFactor, alignCorners);
@@ -221,6 +251,7 @@ IPluginV2* UpsamplePluginCreator::createPlugin(const char* name, const PluginFie
 
 IPluginV2* UpsamplePluginCreator::deserializePlugin(const char* name, const void* serialData, size_t serialLength)
 {
+    printf("UpsamplePluginCreator::deserializePlugin\n");
     // This object will be deleted when the network is destroyed, which will
     // call UpsamplePlugin::destroy()
     return new UpsamplePlugin(name, serialData, serialLength);
@@ -228,10 +259,12 @@ IPluginV2* UpsamplePluginCreator::deserializePlugin(const char* name, const void
 
 void UpsamplePluginCreator::setPluginNamespace(const char* libNamespace) 
 {
+    printf("UpsamplePluginCreator::setPluginNamespace\n");
     mNamespace = libNamespace;
 }
 
 const char* UpsamplePluginCreator::getPluginNamespace() const
 {
+    printf("UpsamplePluginCreator::getPluginNamespace\n");
     return mNamespace.c_str();
 }

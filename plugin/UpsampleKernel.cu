@@ -151,4 +151,5 @@ int UpsampleInference(
                                                                                     rate_h, rate_w, align_corners, 
                                                                                     static_cast<const float*>(inputs),
                                                                                     static_cast<float*>(outputs));
+    return 0;
 }

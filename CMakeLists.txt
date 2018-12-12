@@ -1,28 +1,51 @@
-cmake_minimum_required(VERSION 3.0.0)
-project(plugin_test VERSION 0.1.0)
+# We need cmake >= 3.8, since 3.8 introduced CUDA as a first class language
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+project(UpsamplePlugin LANGUAGES CXX CUDA)
 
+# Enable all compile warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic -Werror")
 
-FIND_PACKAGE(OpenCV)
+# Sets variable to a value if variable is unset.
+macro(set_ifndef var val)
+    if (NOT ${var})
+        set(${var} ${val})
+    endif()
+    message(STATUS "Configurable variable ${var} set to ${${var}}")
+endmacro()
 
-FIND_PACKAGE(CUDA)
+# -------- CONFIGURATION --------
+set_ifndef(TRT_LIB /usr/lib/x86_64-linux-gnu)
+set_ifndef(TRT_INCLUDE /usr/include/x86_64-linux-gnu)
 
-INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
+# Find dependencies:
+message("\nThe following variables are derived from the values of the previous variables unless provided explicitly:\n")
 
-include(CTest)
-enable_testing()
+# TensorRT's nvinfer lib
+find_library(_NVINFER_LIB nvinfer HINTS ${TRT_LIB} PATH_SUFFIXES lib lib64)
+set_ifndef(NVINFER_LIB ${_NVINFER_LIB})
 
-add_compile_options(-std=c++11)
+# -------- BUILDING --------
 
-include_directories(${CMAKE_SOURCE_DIR}/plugin)
+# Add include directories
+include_directories(${CUDA_INC_DIR} ${TRT_INCLUDE} ${CMAKE_SOURCE_DIR}/plugin/)
 
-file(GLOB_RECURSE SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/*.cpp ${CMAKE_SOURCE_DIR}/plugin/*.cu)
+# Define clip plugin library target
+add_library(upsampleplugin MODULE
+  ${CMAKE_SOURCE_DIR}/plugin/UpsampleKernel.cu
+  ${CMAKE_SOURCE_DIR}/plugin/UpsamplePlugin.cpp
+  ${CMAKE_SOURCE_DIR}/plugin/UpsmapleKernel.h
+  ${CMAKE_SOURCE_DIR}/plugin/UpsamplePlugin.h
+)
 
-#add_executable(plugin_test main.cpp ${SOURCE_FILES})
-set(CUDA_NVCC_FLAGS -std=c++11)
-cuda_add_executable(plugin_test main.cpp ${SOURCE_FILES})
+# Use C++11
+target_compile_features(upsampleplugin PUBLIC cxx_std_11)
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
+# Link TensorRT's nvinfer lib
+target_link_libraries(upsampleplugin PRIVATE ${NVINFER_LIB})
 
-TARGET_LINK_LIBRARIES(plugin_test ${OpenCV_LIBS} nvcaffe_parser nvinfer cudnn)
+# We need to explicitly state that we need all CUDA files
+# to be built with -dc as the member functions will be called by
+# other libraries and executables (in our case, Python inference scripts)
+set_target_properties(upsampleplugin PROPERTIES
+  CUDA_SEPARABLE_COMPILATION ON
+)

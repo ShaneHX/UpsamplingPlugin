@@ -91,6 +91,8 @@ def main():
                     1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0
                     ])
     print(arr)
+
+
     with build_engine() as engine:
         # Build an engine, allocate buffers and create a stream.
         # For more information on buffer allocation, refer to the introductory samples.
@@ -98,13 +100,23 @@ def main():
         np.copyto(h_input, arr)
         # print("debug")
         with engine.create_execution_context() as context:
-            # case_num = load_normalized_test_case(data_path, inputs[0].host, mean)
-            # For more information on performing inference, refer to the introductory samples.
-            # The common.do_inference function will return a list of outputs - we only have one in this case.
             do_inference(context, h_input, d_input, h_output, d_output, stream)
             print(h_output)
 
+    # save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
+    # with build_engine() as engine:
+    #     with open(save_engine, "wb") as f:
+    #         f.write(engine.serialize())
 
+    # save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
+    # with open(save_engine, "rb") as f,  trt.Runtime(TRT_LOGGER) as runtime:
+    #     engine = runtime.deserialize_cuda_engine(f.read())
+    #     h_input, d_input, h_output, d_output, stream = allocate_buffers(engine)
+    #     np.copyto(h_input, arr)
+    #     # print("debug")
+    #     with engine.create_execution_context() as context:
+    #         do_inference(context, h_input, d_input, h_output, d_output, stream)
+    #         print(h_output)
 
 if __name__ == "__main__":
     main()

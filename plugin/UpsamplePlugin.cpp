@@ -42,10 +42,10 @@ UpsamplePlugin::UpsamplePlugin(const std::string name, int scale_factor, bool al
     , mScaleFactor(scale_factor)
 {
     printf("UpsamplePlugin::UpsamplePlugin1\n");
-    printf("------s: %d, a: %d\n",mScaleFactor, mAlignCorners);
     mInputShape.c() = -1;
     mInputShape.h() = -1;
     mInputShape.w() = -1;
+    mInputVolume = 0;
 }
 
 UpsamplePlugin::UpsamplePlugin(const std::string name, const void* data, size_t length)
@@ -59,10 +59,22 @@ UpsamplePlugin::UpsamplePlugin(const std::string name, const void* data, size_t 
     mScaleFactor = readFromBuffer<int>(d);
     mAlignCorners = readFromBuffer<bool>(d);
 
-    mInputShape.c() = -1;
-    mInputShape.h() = -1;
-    mInputShape.w() = -1;
+    mInputVolume = readFromBuffer<size_t>(d);
+    mInputShape.c() = readFromBuffer<int>(d);
+    mInputShape.h() = readFromBuffer<int>(d);
+    mInputShape.w() = readFromBuffer<int>(d);
 
+    // writeToBuffer(d, mInputVolume);
+    // writeToBuffer(d, mInputShape.c());
+    // writeToBuffer(d, mInputShape.h());
+    // writeToBuffer(d, mInputShape.w());
+
+
+    // mInputShape.c() = -1;
+    // mInputShape.h() = -1;
+    // mInputShape.w() = -1;
+    // mInputVolume = 0;
+    printf("length: %d\n", int(length));
     assert(d == (a + length));
 
 }
@@ -95,12 +107,6 @@ Dims UpsamplePlugin::getOutputDimensions(int index, const Dims* inputs, int nbIn
     // printf("%d\n",inputs[0].nbDims);
     // Clipping doesn't change input dimension, so output Dims will be the same as input Dims
 
-    int b = inputs[0].d[0];
-    int c = inputs[0].d[1];
-    int h = inputs[0].d[2]*mScaleFactor;
-    int w = inputs[0].d[3]*mScaleFactor;
-
-    printf("------b:%d, c:%d, h:%d, w:%d\n",b,c,h,w);
     return nvinfer1::DimsNCHW{inputs[0].d[0], inputs[0].d[1], inputs[0].d[2]*mScaleFactor, inputs[0].d[3]*mScaleFactor};
     // return *inputs;
 }
@@ -132,7 +138,9 @@ int UpsamplePlugin::enqueue(int batchSize, const void* const* inputs, void** out
 size_t UpsamplePlugin::getSerializationSize() const
 {
     printf("UpsamplePlugin::getSerializationSize\n");
-    return sizeof(bool) + sizeof(int);
+    return sizeof(mScaleFactor) + sizeof(mAlignCorners) + 
+            sizeof(mInputVolume) + sizeof(mInputShape.c()) + 
+            sizeof(mInputShape.h()) + sizeof(mInputShape.w());
 }
 
 
@@ -144,13 +152,19 @@ void UpsamplePlugin::serialize(void* buffer) const
 
     writeToBuffer(d, mScaleFactor);
     writeToBuffer(d, mAlignCorners);
+    writeToBuffer(d, mInputVolume);
+    writeToBuffer(d, mInputShape.c());
+    writeToBuffer(d, mInputShape.h());
+    writeToBuffer(d, mInputShape.w());
+    
+    printf("------getSerializationSize: %d\n",int(getSerializationSize()));
 
     assert(d == a + getSerializationSize());
 }
 
 void UpsamplePlugin::configureWithFormat(const Dims* inputs, int nbInputs, const Dims* outputs, int nbOutputs, DataType type, PluginFormat format, int)
 {
-    printf("UpsamplePlugin::configureWithFormat\n");
+    printf("-----UpsamplePlugin::configureWithFormat\n");
     // Validate input arguments
     assert(nbOutputs == 1);
     assert(type == DataType::kFLOAT);
@@ -242,8 +256,8 @@ IPluginV2* UpsamplePluginCreator::createPlugin(const char* name, const PluginFie
         } 
         else if (strcmp(fields[i].name, "alignCorners") == 0) {
             assert(fields[i].type == PluginFieldType::kINT8);
-            int a = *(static_cast<const int8_t*>(fields[i].data));
-            alignCorners = (a==0) ? false : true;
+            alignCorners = bool(*(static_cast<const int8_t*>(fields[i].data)));
+
         }
     }
     return new UpsamplePlugin(name, scaleFactor, alignCorners);

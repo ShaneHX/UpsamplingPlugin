@@ -126,91 +126,29 @@ __global__ void BilinearKernel(
 }
 
 
-// int UpsampleInference(
-//     cudaStream_t stream,
-//     int n,
-//     int scale_factor,
-//     int input_b,
-//     int input_c,
-//     int input_h,
-//     int input_w,
-//     bool align_corners,
-//     const void* inputs,
-//     void* outputs)
-    
-// {
-//     int max_threads = get_max_thread_num();
-//     int n = output_h * output_w;
-//     int kernel_num = get_kernel_num(n, max_threads);
-
-//     float *dev_inputs,*dev_outputs;
-//     int n_inputs = input_b * input_c * input_h * input_w;
-//     int n_outputs = input_b * input_c * output_h * output_w;
-//     BilinearKernel<float> <<< kernel_num, max_threads >>> (n, input_b, input_c, input_h, input_w,
-//                                                             output_h, output_w, 
-//                                                             rate_h, rate_w, align_corners, 
-//                                                             static_cast<const float*>inputs, 
-//                                                             static_cast<float*>outputs);
-
-
-// }
-
-
-
-void cuda_test(int input_b,
-                int input_c,
-                int input_h,
-                int input_w,
-                int output_h,
-                int output_w,
-                const float rate_h,
-                const float rate_w,
-                bool align_corners,
-                const float* inputs,
-                float* outputs)
-{
-    int max_threads = get_max_thread_num();
-    int n = output_h * output_w;
-    int kernel_num = get_kernel_num(n, max_threads);
-
-    float *dev_inputs,*dev_outputs;
-    int n_inputs = input_b * input_c * input_h * input_w;
-    int n_outputs = input_b * input_c * output_h * output_w;
-    cudaMalloc((void**)&dev_inputs, n_inputs * sizeof(float));
-    cudaMalloc((void**)&dev_outputs, n_outputs * sizeof(float));
-    cudaMemcpy(dev_inputs, inputs, n_inputs * sizeof(float), cudaMemcpyHostToDevice);
-    BilinearKernel<float> <<< kernel_num, max_threads >>> (n,input_b,input_c,input_h,input_w,
-                                                            output_h, output_w, 
-                                                            rate_h, rate_w, align_corners, 
-                                                            (float*)dev_inputs, (float*)dev_outputs);
-    cudaMemcpy(outputs, dev_outputs, n_outputs * sizeof(float), cudaMemcpyDeviceToHost);
-
-    cudaFree(dev_inputs);
-    cudaFree(dev_outputs);
-    
-}
 int UpsampleInference(
-    // cudaStream_t stream,
-    const void* inputs,
-    void* outputs,
-    int scale_factor,
+    cudaStream_t stream,
+    int n,
     int input_b,
     int input_c,
     int input_h,
     int input_w,
-    bool align_corners)
+    int scale_factor,
+    bool align_corners,
+    const void* inputs,
+    void* outputs)
     
 {
     int output_h = input_h * scale_factor;
-    int output_w = input_h * scale_factor;
-
+    int output_w = input_w * scale_factor;
+    int max_threads = get_max_thread_num();
+    int kernel_num = get_kernel_num(n, max_threads);
     float rate_h = linear_upsampling_compute_scale(input_h, output_h, align_corners);
     float rate_w = linear_upsampling_compute_scale(input_w, output_w, align_corners);
-    
 
-    cuda_test(input_b,input_c,input_h,input_w,output_h, output_w, rate_h, rate_w, align_corners, (float*)inputs, (float*)outputs);
-    
-
-
-    return 100;
+    BilinearKernel<float><<< kernel_num, max_threads, 0, stream>>>(n,input_b,input_c,input_h,input_w,
+                                                                                    output_h, output_w, 
+                                                                                    rate_h, rate_w, align_corners, 
+                                                                                    static_cast<const float*>(inputs),
+                                                                                    static_cast<float*>(outputs));
 }

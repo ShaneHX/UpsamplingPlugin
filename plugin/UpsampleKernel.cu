@@ -138,7 +138,7 @@ int UpsampleInference(
     const void* inputs,
     void* outputs)
 {
-    printf("n=%d,b:%d, c:%d, w:%d, h:%d, s:%d, a:%d\n",n, input_b, input_c,input_h,input_w, scale_factor, align_corners);
+    //printf("n=%d,b:%d, c:%d, w:%d, h:%d, s:%d, a:%d\n",n, input_b, input_c,input_h,input_w, scale_factor, align_corners);
     int output_h = input_h * scale_factor;
     int output_w = input_w * scale_factor;
     int max_threads = get_max_thread_num();

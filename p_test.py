@@ -36,12 +36,12 @@ def allocate_buffers(engine):
     return h_input, d_input, h_output, d_output, stream
 
 
-def get_trt_plugin(plugin_name):
+def get_trt_plugin(plugin_name, sacle_factor=2, align_corners=False):
     plugin = None
     for plugin_creator in PLUGIN_CREATORS:
         if plugin_creator.name == plugin_name:
-            scale_factor_field = trt.PluginField("scaleFactor", np.array([2], dtype=np.int8), trt.PluginFieldType.INT8)
-            align_corners_field = trt.PluginField("alignCorners", np.array([0], dtype=np.int8), trt.PluginFieldType.INT8)
+            scale_factor_field = trt.PluginField("scaleFactor", np.array([sacle_factor], dtype=np.int8), trt.PluginFieldType.INT8)
+            align_corners_field = trt.PluginField("alignCorners", np.array([int(align_corners)], dtype=np.int8), trt.PluginFieldType.INT8)
             field_collection = trt.PluginFieldCollection([align_corners_field, scale_factor_field])
             plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
     return plugin
@@ -93,30 +93,30 @@ def main():
     print(arr)
 
 
-    with build_engine() as engine:
-        # Build an engine, allocate buffers and create a stream.
-        # For more information on buffer allocation, refer to the introductory samples.
-        h_input, d_input, h_output, d_output, stream = allocate_buffers(engine)
-        np.copyto(h_input, arr)
-        # print("debug")
-        with engine.create_execution_context() as context:
-            do_inference(context, h_input, d_input, h_output, d_output, stream)
-            print(h_output)
-
-    # save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
     # with build_engine() as engine:
-    #     with open(save_engine, "wb") as f:
-    #         f.write(engine.serialize())
-
-    # save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
-    # with open(save_engine, "rb") as f,  trt.Runtime(TRT_LOGGER) as runtime:
-    #     engine = runtime.deserialize_cuda_engine(f.read())
+    #     # Build an engine, allocate buffers and create a stream.
+    #     # For more information on buffer allocation, refer to the introductory samples.
     #     h_input, d_input, h_output, d_output, stream = allocate_buffers(engine)
     #     np.copyto(h_input, arr)
     #     # print("debug")
     #     with engine.create_execution_context() as context:
     #         do_inference(context, h_input, d_input, h_output, d_output, stream)
     #         print(h_output)
+
+    # save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
+    # with build_engine() as engine:
+    #     with open(save_engine, "wb") as f:
+    #         f.write(engine.serialize())
+
+    save_engine = os.path.join(os.path.dirname(__file__), "sample.engine")
+    with open(save_engine, "rb") as f,  trt.Runtime(TRT_LOGGER) as runtime:
+        engine = runtime.deserialize_cuda_engine(f.read())
+        h_input, d_input, h_output, d_output, stream = allocate_buffers(engine)
+        np.copyto(h_input, arr)
+        # print("debug")
+        with engine.create_execution_context() as context:
+            do_inference(context, h_input, d_input, h_output, d_output, stream)
+            print(h_output)
 
 if __name__ == "__main__":
     main()

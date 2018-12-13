@@ -15,7 +15,7 @@ public:
 
     UpsamplePlugin(const std::string name, const void* data, size_t length);
 
-    // It doesn't make sense to make ClipPlugin without arguments, so we delete default constructor.
+    // It doesn't make sense to make UpsamplePlugin without arguments, so we delete default constructor.
     UpsamplePlugin() = delete;
 
     int getNbOutputs() const override;

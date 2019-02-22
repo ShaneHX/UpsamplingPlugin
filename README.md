@@ -1,5 +1,7 @@
 UpsamplingPlugin
 
+This Plugin only support bilinear upsample for now.
+
 # How?
 
 ## 如何创建一个Layer Plugin?
